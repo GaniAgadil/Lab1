@@ -74,10 +74,69 @@ p <- p + scale_color_discrete(name = 'Elevation',
 p <- p + ggtitle('Weather Stations')
 p
 ```
+## The US map  with AK and HI having state abbreviation ID in center
+
+```{r, warning = F}
+
+library(ggplot2)   
+library(ggalt)     # coord_proj
+library(albersusa) # devtools::install_github("hrbrmstr/albersusa")
+library(ggthemes)  # theme_map
+library(rgeos)     # centroids
+library(dplyr)
+#devtools::install_github("hrbrmstr/albersusa")
+
+# composite map with AK & HI
+usa_map <- usa_composite()
+
+# calculate the centroids for each state
+gCentroid(usa_map, byid=TRUE) %>% 
+  as.data.frame() %>% 
+  mutate(state=usa_map@data$iso_3166_2) -> centroids
+
+# make it usable in ggplot2
+usa_map <- fortify(usa_map)
+
+gg <- ggplot()
+gg <- gg + geom_map(data=usa_map, map=usa_map,
+                    aes(long, lat, map_id=id),
+                    color="blue", size=0.1, fill="green")
+gg <- gg + geom_text(data=centroids, aes(x, y, label=state), size=2)
+gg <- gg + coord_proj(us_laea_proj)
+gg <- gg + theme_map()
+gg
+
+```
+## Add time zone to the US map
+```{r setup, include = FALSE}
+
+# US map with time zone for every county
+#install.packages("countytimezones")
+library(countytimezones)
+library(choroplethr)
+library(choroplethrMaps)
+library(ggplot2)
+library(dplyr)
+
+data(county_tzs)
+example_df <- data.frame(fips = county_tzs$fips,
+                         datetime = "2019-02-09 08:30")
+head(example_df)
+example_df <- add_local_time(df = example_df,
+                             fips = example_df$fips,
+                             datetime_colname = "datetime")
+head(example_df)
+
+to_plot <- example_df %>%
+  select(fips, local_time) %>%
+  mutate(local_time = factor(local_time)) %>%
+  dplyr::rename(region = fips, value = local_time)
+a <- CountyChoropleth$new(to_plot)
+a$ggplot_scale <- scale_fill_brewer(type = "qual", drop = FALSE)
+a$render()
 
 
-
-
+```
 ##... and some funny file formats
 
 ```{r setup, include = FALSE}
@@ -99,10 +158,13 @@ files[which(files == './ushcn.v2.5.5.20190204/USH00132999.raw.tavg')]
 ## one that contains the temperature information associated to Fort Dodge, IA.
 
 #finding the related file from the csv file with using sql command
+#first install sqldf package
 library(sqldf)
 #install.packages('sqldf')
+# extract the value of coulumn 1 to 4 related to a row having "fort dofge"
 namesql<-sqldf("select X1,X2,X3,X4 from weather where X9 LIKE '%FORT DODGE%'")
 library(stringr)
+#paste all value of related x1 to x4 in 1 variable named namefile, this variable having the name of file we are interested
 namefile<-str_c(namesql, collapse = "")
 fullnamefile<-list.files( path = files, patt=namefile)
 fullnamefile
